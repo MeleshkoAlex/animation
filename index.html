@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <style>
+        canvas {
+            border: 1px solid #000000;
+        }
+    </style>
+    <canvas width="1000" height="500" id="canvas"></canvas>
+    <script>
+
+        var canvas = document.getElementById('canvas');
+        var ctx = canvas.getContext('2d');
+
+        var coords = {
+            x: 10,
+            y: 400
+        }
+        var p = 8;
+        ctx.moveTo(coords.x,coords.y);
+        ctx.lineWidth = 3;
+
+        function drawCanvas(progress){
+            ctx.lineTo(coords.x,coords.y - (progress * (p * 10)));
+            ctx.stroke();
+            coords.x+=p;
+        }
+
+        var AnimateTiming = {
+            // no easing, no acceleration
+            linear: function(t){ return t },
+            // accelerating from zero velocity 
+            easeInQuad: function(t){ return t*t },
+            // decelerating to zero velocity 
+            easeOutQuad: function(t){ return t*(2-t) },
+            // acceleration until halfway, then deceleration 
+            easeInOutQuad: function(t){ return t<.5 ? 2*t*t : -1+(4-2*t)*t },
+            // accelerating from zero velocity  }
+            easeInCubic: function(t){ return t*t*t },
+            // decelerating to zero velocity  }
+            easeOutCubic: function(t){ return (--t)*t*t+1 },
+            // acceleration until halfway, then deceleration  
+            easeInOutCubic: function(t){ return t<.5 ? 4*t*t*t : (t-1)*(2*t-2)*(2*t-2)+1 },
+            // accelerating from zero velocity  }
+            easeInQuart: function(t){ return t*t*t*t },
+            // decelerating to zero velocity  }
+            easeOutQuart: function(t){ return 1-(--t)*t*t*t },
+            // acceleration until halfway, then deceleration 
+            easeInOutQuart: function(t){ return t<.5 ? 8*t*t*t*t : 1-8*(--t)*t*t*t },
+            // accelerating from zero velocity 
+            easeInQuint: function(t){ return t*t*t*t*t },
+            // decelerating to zero velocity 
+            easeOutQuint: function(t){ return 1+(--t)*t*t*t*t },
+            // acceleration until halfway, then deceleration  
+            easeInOutQuint: function(t){ return t<.5 ? 16*t*t*t*t*t : 1+16*(--t)*t*t*t*t },
+            // elastic bounce effect at the beginning
+            easeInElastic: function (t) { return (.04 - .04 / t) * Math.sin(25 * t) + 1 },
+            // elastic bounce effect at the end
+            easeOutElastic: function (t) { return .04 * t / (--t) * Math.sin(25 * t) },
+            // elastic bounce effect at the beginning and end
+            easeInOutElastic: function (t) { return (t -= .5) < 0 ? (.02 + .01 / t) * Math.sin(50 * t) : (.02 - .01 / t) * Math.sin(50 * t) + 1 },
+            easeInSin: function (t) {return 1 + Math.sin(Math.PI / 2 * t - Math.PI / 2)},
+            easeOutSin : function (t) {return Math.sin(Math.PI / 2 * t); },
+            easeInOutSin: function (t) {return (1 + Math.sin(Math.PI * t - Math.PI / 2)) / 2;},
+            bounce: function(timeFraction) {
+                for (var a = 0, b = 1, result; 1; a += b, b /= 2) {
+                    if (timeFraction >= (7 - 4 * a) / 11) {
+                    return -Math.pow((11 - 6 * a - 11 * timeFraction) / 4, 2) + Math.pow(b, 2)
+                    }
+                }
+            },
+            quad: function(timeFraction){
+                return Math.pow(timeFraction, 2);
+            }
+        }
+
+        function Animate(options){
+            var self = this;
+            this._options = options;
+            this._duration = (options.revers && options.duration / 2  || 250) || (options.duration   || 500 ),
+            this._start = performance.now();
+            this._timing = AnimateTiming[options.timing] || AnimateTiming.linear;
+            this._update = null;
+            this._values = null;
+            this._infinitely = options.infinitely || false;
+            this._revers = { revers: options.revers || false, direction: 0,complete: 0};
+            if(options.length){
+                this._values = options.options;
+            }else if(options.onUpdate) {
+                this._update = options.onUpdate;
+            }else{
+                return;
+            }
+            setTimeout(function(){
+                self._animate();
+            }, options.delay || 0);
+        }
+        Animate.prototype._animate = function(){
+            var self = this;
+            this._start = performance.now();
+            requestAnimationFrame(function animate(time) {
+                var timeFraction = (time - self._start) / self._duration;
+                if (timeFraction > 1){
+                    timeFraction = 1;
+                    if(self._infinitely && self._revers.revers){
+                        self._updated(timeFraction);
+                        self._setDirection();
+                        self._animate();
+                        return;
+                    }else if(self._revers.revers){
+                        self._updated(timeFraction);
+                        self._setDirection();
+                        if(!self._revers.complete){
+                            self._revers.complete = 1;
+                            self._animate()
+                        } 
+                        return;
+                    }else if(self._infinitely){
+                        self._updated(timeFraction);
+                        self._animate();
+                        return;
+                    }
+                    
+                }else if(timeFraction < 0){
+                    timeFraction = 0;
+                }
+                self._updated(timeFraction);
+                if (timeFraction < 1) {
+                    requestAnimationFrame(animate);
+                }
+            });
+        }
+
+        Animate.prototype._startAnim = function(){
+            this._startAnim();
+        }
+        Animate.prototype._setDirection = function(){
+            if(this._revers.revers) this._revers.direction = !this._revers.direction;
+        }
+
+        Animate.prototype._updated = function(timeFraction){
+            if(timeFraction == undefined) return;
+            var progress = this._timing(timeFraction);
+            this._update(progress,this._revers.direction)
+        }
+        Animate.prototype._draw = function(){
+
+        }
+
+        new Animate({
+            duration: 2000,
+            infinitely: true,
+            revers: true,
+            // delay: 1100,
+            // delayStart: 1000,
+            onUpdate: (progress,revers) =>{
+                // if(!revers){
+                //     canvas.style.transform = `translate(${progress * 200}px,${progress * 200}px)`
+                // }else if(revers){
+                //     canvas.style.transform = `translate(${200 - (progress * 200) }px,${200 - (progress * 200)}px)`
+                // }
+                drawCanvas(progress)
+                console.log(progress)
+            },
+            onComplete: ()=>{},
+            timing: "bounce",
+            // options:[
+            //     {
+            //         elem: canvas,
+            //         transform:{
+            //             rotate:{
+            //                 from: 200,
+            //                 to: 200,
+            //                 units: "deg"
+            //             },
+            //             translate:{
+            //                 from: 200,
+            //                 to: 300,
+            //                 units: "px"
+            //             }
+            //         }
+            //     }
+            // ]
+        });
+
+    </script>
+</body>
+
+</html>
